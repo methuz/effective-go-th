@@ -203,7 +203,9 @@ func Contents(filename string) (string, error) {
 
 ###Data
 
-การใช้ new จะ Allocate Memory แต่ไม่ Initialize Memory (ให้ค่าเป็น 0) แล้ว return มาเป็น Address (Pointer)
+######new
+
+การใช้ new จะ Allocate Memory แต่ไม่ Initialize Memory (ให้ค่าเป็น 0) แล้ว return มาเป็น Address (Pointer) หรือ nil นั่นเอง
 
 ```
 p := new(SyncedBuffer)  // type *SyncedBuffer
@@ -222,6 +224,36 @@ var v SyncedBuffer      // type  SyncedBuffer
 ```
 ถ้าอยากกำหนดค่าก็ให้ใช้แบบนี้ `File{fd, name, nil, 0}` เรียงตามลำดับ
 แต่ถ้าไม่อยากเรียงก็ให้ใส่ label  เช่น `File{fd: fd, name: name}`
+
+`composite literal` ยังสามารถใช้ในการสร้าง array, slice หรือ map ได้ด้วย
+```
+a := [...]string   {Enone: "no error", Eio: "Eio", Einval: "invalid argument"}
+s := []string      {Enone: "no error", Eio: "Eio", Einval: "invalid argument"}
+m := map[int]string{Enone: "no error", Eio: "Eio", Einval: "invalid argument"}
+```
+
+######make
+`make` เช่น make(T, args) นั้นใช้สร้าง slice map และ channels เท่านั้น และมันจะ `return` ค่าที่ initialized(ไม่ใช่ 0 เหมือน new) แล้วของประเภท T (ไม่ใช่ pointer เหมือน new)
+
+```
+make([]int, 10, 100)
+```
+ตัวอย่างข้างบนจะสร้าง array ขนาด 100 int แล้วสร้าง slice struct ขนาด 10 และมีขนาดสูงสุด 100 ชี้ไปที่ 10 ตัวแรก ของ array (งงไหม ผมก็งงเหมือนกัน ลองอ่านเกี่ยวกับ Slice ด้านล่างแล้วไปอ่านนี่ต่อเลย [Arrays, slices (and strings): The mechanics of 'append']()http://blog.golang.org/slices)
+ลอง fmt.Println() ออกมาดู ได้ผลลัพท์เป็น `[0 0 0 0 0 0 0 0 0 0]`
+
+ ตัวอย่างด้านล่างเป็นการเปรียบเทียบ new กับ make
+ ```
+var p *[]int = new([]int)       // allocates slice structure; *p == nil; rarely useful
+var v  []int = make([]int, 100) // the slice v now refers to a new array of 100 ints
+
+// Unnecessarily complex:
+var p *[]int = new([]int)
+*p = make([]int, 100, 100)
+
+// Idiomatic:
+v := make([]int, 100)
+```
+
 
 ### อื่นๆ
 * Go มี Semicolon (;) ปิดท้าย แต่ไม่แสดงใน Code
