@@ -1,6 +1,8 @@
 ###Intro
 บทความนี้เกิดจากการอ่านและบันทึกสิ่งที่ได้จากการอ่าน [Effective Go](https://golang.org/doc/effective_go.html) จึงไม่ได้ถอดความจากต้นฉบับทั้งหมด ถ้าใครพบข้อผิดพลาดหรือต้องการแก้ไขอะไรก็ตามให้ถูกต้อง สามารถ Fork แล้ว Pull Request เข้ามาได้เลยครับ
 ###Comment
+การคอมเมนต์ใน Go ใช้แบบเดียวกับ C ได้เล่น นั้นก็คือ `//` สำหรับ คอมเมนต์ทั้งบรรทัด และ `/**/` สำหรับคอมเมนต์หลายบรรทัด
+
 การคอมเมนต์บนหัวของฟังก์ชันให้เริ่มต้นด้วยชื่อฟังก์ชันนั้นเสมอ เพื่อเวลาที่เราใช้คำสั่ง godoc หาข้อมูลแล้ว pipe ไปที่ grep จะได้หาเจอง่ายขึ้น ยกตัวอย่างเช่น
 
 ```
@@ -336,6 +338,82 @@ _, present := timeZone[tz]
 เราสามารถลบของมูลออกจาก map ได้ด้วยฟังก์ชัน `delete` (ใช้ได้แม้ว่า key นั้นจะไม่มีใน map)
 ```
 delete(timeZone, "PDT")
+```
+
+###Constant
+ค่าคงที่ใน Go ถูกสร้างตอนคอมไพล์ ถึงแม้จะประกาศเป็นตัวแปรแบบ locals ก็ตาม และมันเป็นได้แค่ numbers, characters, strings หรือ booleans เนื่องจากต้องจำกัดเวลาที่ใช้ในการคอมไพล์ทำให้การกำหนดค่าให้มันจำเป็นต้องเป็น "constant expression" อย่างเช่น `1<<3` เป็น constant expression แต่ `math.Sin(math.Pi/4)` นั้นไม่ใช่เพราะว่าฟังก์ชันใน math.Sin จะถูกรันตอนคอมไพล์
+
+```
+type ByteSize float64
+
+const (
+    _           = iota                   // iota คือการ Auto increment
+    KB ByteSize = 1 << (10 * iota) // 1 << (10*1)
+    MB                                   // 1 << (10*2)
+    GB                                   // 1 << (10*3)
+    TB                                   // 1 << (10*4)
+    PB                                   // 1 << (10*5)
+    EB                                   // 1 << (10*6)
+    ZB                                   // 1 << (10*7)
+    YB                                   // 1 << (10*8)
+```
+
+เนื่องจาก Go สามารถสร้างฟังก์ชันให้กับ type ที่ยูสเซอร์สร้างขึ้นได้ (เช่นฟังก์ชัน String เพื่อ print) ทำให้เราสามารถกำหนดฟอร์แมตแบบอัตโนมัติได้ เราจะเห็นเทคนิคนี้บ่อย ๆ โดยใช้งานกับ structs
+
+```
+func (b ByteSize) String() string {
+    switch {
+    case b >= YB:
+        return fmt.Sprintf("%.2fYB", b/YB)
+    case b >= ZB:
+        return fmt.Sprintf("%.2fZB", b/ZB)
+    case b >= EB:
+        return fmt.Sprintf("%.2fEB", b/EB)
+    case b >= PB:
+        return fmt.Sprintf("%.2fPB", b/PB)
+    case b >= TB:
+        return fmt.Sprintf("%.2fTB", b/TB)
+    case b >= GB:
+        return fmt.Sprintf("%.2fGB", b/GB)
+    case b >= MB:
+        return fmt.Sprintf("%.2fMB", b/MB)
+    case b >= KB:
+        return fmt.Sprintf("%.2fKB", b/KB)
+    }
+    return fmt.Sprintf("%.2fB", b)
+}
+```
+
+ตัวอย่างข้างบน เมื่อเราใช้ b.String() จะทำการแสดงขนาดตามด้วยคำอุปสรรคอย่าง YB หรือ TB โดยอัตโนมัติ
+
+ฟังก์ชัน Sprintf นั้นปลองภัย (safe) มันจะไม่ถูกเรียกแบบ Recursion ไปเรื่อย ๆ เพราะว่า Sprintf จะฟังก์ชัน String() เฉพาะเมื่อมันต้องการ string จริง ๆ เท่านั้น (ในตัวอย่างใช้ %f ไม่ใช่ %s เลยไม่เกิด Recursion)
+
+### Variables
+ตัวแปรถูกสร้างเหมือนค่าคงที่ แต่การกำหนดค่าเริ่มต้นสามารถใช้ expression (นิพจน์) แบบไหนก็ได้
+```
+var (
+    home   = os.Getenv("HOME")
+    user   = os.Getenv("USER")
+    gopath = os.Getenv("GOPATH")
+)
+```
+
+### ฟังก์ชัน init
+แต่ละไฟล์สามารถมีฟังก์ชัน init ของตัวเองได้ โดยมันจะถูกเรียกหลังจากตัวแปรทุกตัวในทุกแพคเกจได้สร้างค่าตั้งต้นของพวกมันแล้ว ฟังก์ชัน init ไม่ได้มีไว้เพื่อกำหนดค่าต่าง ๆ แต่ปกติแล้วเอาไว้เช็คความถูกต้องและแก้ไขค่าต่าง ๆ ก่อนที่จะรันจริงดังตัวอย่างด้านล่าง
+```
+func init() {
+    if user == "" {
+        log.Fatal("$USER not set")
+    }
+    if home == "" {
+        home = "/home/" + user
+    }
+    if gopath == "" {
+        gopath = home + "/go"
+    }
+    // gopath may be overridden by --gopath flag on command line.
+    flag.StringVar(&gopath, "gopath", gopath, "override default GOPATH")
+}
 ```
 
 ###อื่นๆ
